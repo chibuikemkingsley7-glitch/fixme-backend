@@ -1,39 +1,93 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
-const app = express();
-const PORT = process.env.PORT || 5000;
+const multer = require('multer');
+const dotenv = require('dotenv');
+const bcrypt = require('bcrypt');
 
+dotenv.config();
+const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
-let users = [];
-let workers = [
-  {id:1, name:'Alice', type:'Hairdresser', exp:'6months-1year', price:4000},
-  {id:2, name:'Bob', type:'Barber', exp:'3years-8years', price:10000}
-];
+// ===== MongoDB Connection =====
+mongoose.connect(process.env.MONGO_URI, {useNewUrlParser:true, useUnifiedTopology:true})
+  .then(()=>console.log("MongoDB connected"))
+  .catch(err=>console.log(err));
 
-app.post('/signup', (req,res)=>{
-  const {email,password} = req.body;
-  users.push({email,password});
-  res.json({message:'Account created'});
+// ===== Models =====
+const Agent = require('./models/Agent');
+const Customer = require('./models/Customer');
+const Booking = require('./models/Booking');
+
+// ===== Multer setup for images =====
+const storage = multer.diskStorage({
+  destination: function(req,file,cb){ cb(null,'uploads/'); },
+  filename: function(req,file,cb){ cb(null, Date.now()+"-"+file.originalname);}
+});
+const upload = multer({storage:storage});
+
+// ===== Customer Signup/Login =====
+app.post('/signup', async(req,res)=>{
+  try{
+    const {email,password} = req.body;
+    const existing = await Customer.findOne({email});
+    if(existing) return res.json({message:"Email already registered"});
+    const hashed = await bcrypt.hash(password,10);
+    const newUser = new Customer({email,password:hashed});
+    await newUser.save();
+    res.json({message:"Account created"});
+  } catch(e){ res.status(500).json({message:"Error"}) }
 });
 
-app.post('/login',(req,res)=>{
-  const {email,password} = req.body;
-  const user = users.find(u=>u.email===email && u.password===password);
-  if(user) res.json({message:'Login success', user:{email}});
-  else res.status(401).json({message:'Invalid credentials'});
+app.post('/login', async(req,res)=>{
+  try{
+    const {email,password} = req.body;
+    const user = await Customer.findOne({email});
+    if(!user) return res.json({message:"User not found"});
+    const valid = await bcrypt.compare(password,user.password);
+    if(!valid) return res.json({message:"Wrong password"});
+    res.json({message:"Logged in"});
+  } catch(e){ res.status(500).json({message:"Error"}) }
 });
 
-app.get('/workers',(req,res)=>{
-  const {type} = req.query;
-  const filtered = workers.filter(w=>w.type===type);
-  res.json(filtered);
+// ===== Agent Registration =====
+app.post('/registerAgent', upload.fields([{name:'profilePic'},{name:'kitPic'}]), async(req,res)=>{
+  try{
+    const {name,email,password,address,service,experience,purpleStar} = req.body;
+    const hashed = await bcrypt.hash(password,10);
+    const agent = new Agent({
+      name,email,password:hashed,address,service,experience,
+      profilePic:req.files['profilePic'][0].path,
+      kitPic:req.files['kitPic'][0].path,
+      purpleStar: purpleStar === "true",
+      status:'pending' // must be verified manually
+    });
+    await agent.save();
+    res.json({message:"Agent submitted, pending verification"});
+  } catch(e){ res.status(500).json({message:"Error"}) }
 });
 
-app.post('/book',(req,res)=>{
-  const {workerId,location,price} = req.body;
-  res.json({message:'Booking successful', workerId, location, price});
+// ===== Get Verified Agents =====
+app.get('/agents', async(req,res)=>{
+  try{
+    const service = req.query.service;
+    const agents = await Agent.find({service, status:'verified'});
+    res.json(agents);
+  } catch(e){ res.status(500).json({message:"Error"}) }
 });
 
-app.listen(PORT,()=>console.log(`FixMe backend running on port ${PORT}`));
+// ===== Booking =====
+app.post('/book', async(req,res)=>{
+  try{
+    const {agentId,price,location} = req.body;
+    const booking = new Booking({agent:agentId,price,location});
+    await booking.save();
+    res.json({message:"Booking confirmed"});
+  } catch(e){ res.status(500).json({message:"Error"}) }
+});
+
+// ===== Start Server =====
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
