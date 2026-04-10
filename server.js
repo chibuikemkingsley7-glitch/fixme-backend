@@ -90,6 +90,9 @@ app.post('/book', async(req,res)=>{
 
 // ===== Start Server =====
 const PORT = process.env.PORT || 5000;
+app.get('/', (req, res) => {
+  res.send("FixMe backend is running 🚀");
+});
 app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
 app.get('/agents', async(req,res)=>{
   try{
