@@ -91,3 +91,12 @@ app.post('/book', async(req,res)=>{
 // ===== Start Server =====
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
+app.get('/agents', async(req,res)=>{
+  try{
+    const service = req.query.service;
+    const agents = await Agent.find({service, status:'verified'});
+    res.json(agents);
+  } catch(e){
+    res.status(500).json({message:"Error"});
+  }
+});
