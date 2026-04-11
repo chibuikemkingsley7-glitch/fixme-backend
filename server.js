@@ -105,10 +105,12 @@ app.get('/agents', async(req,res)=>{
 });
 app.post('/add-agent', async (req, res) => {
   try {
+    console.log(req.body); // 
     const agent = new Agent(req.body);
     await agent.save();
     res.json({message: "Agent added"});
   } catch (e) {
+    console.log(e); //
     res.status(500).json({message: "Error"});
   }
 });
