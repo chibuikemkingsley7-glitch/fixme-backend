@@ -109,13 +109,9 @@ app.get('/agents', async(req,res)=>{
   try{
     const service = req.query.service;
 
-    let agents;
-
-    if(service){
-      agents = await Agent.find({ service });
-    }else{
-      agents = await Agent.find({});
-    }
+    const agents = await Agent.find({
+      service: new RegExp(`^${service}$`, 'i') // ignores case
+    });
 
     res.json(agents);
   }catch(e){
