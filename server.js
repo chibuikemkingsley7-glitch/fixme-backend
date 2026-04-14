@@ -24,33 +24,44 @@ const Booking = require('./models/Booking');
 
 // ===== Multer setup =====
 const storage = multer.diskStorage({
-  destination: function(req,file,cb){ cb(null,'uploads/'); },
-  filename: function(req,file,cb){ cb(null, Date.now()+"-"+file.originalname);}
+  destination: function(req,file,cb){
+    cb(null,'uploads/');
+  },
+  filename: function(req,file,cb){
+    cb(null, Date.now()+"-"+file.originalname);
+  }
 });
 const upload = multer({storage:storage});
 
-// ===== Customer Signup =====
+// ===== CUSTOMER SIGNUP =====
 app.post('/signup', async(req,res)=>{
   try{
     const {email,password} = req.body;
+
     const existing = await Customer.findOne({email});
     if(existing) return res.json({message:"Email already registered"});
 
     const hashed = await bcrypt.hash(password,10);
-    const newUser = new Customer({email,password:hashed});
+
+    const newUser = new Customer({
+      email,
+      password: hashed
+    });
+
     await newUser.save();
 
     res.json({message:"Account created"});
-  } catch(e){
+  }catch(e){
     console.log(e);
     res.status(500).json({message:"Error"});
   }
 });
 
-// ===== Customer Login =====
+// ===== CUSTOMER LOGIN =====
 app.post('/login', async(req,res)=>{
   try{
     const {email,password} = req.body;
+
     const user = await Customer.findOne({email});
     if(!user) return res.json({message:"User not found"});
 
@@ -58,13 +69,13 @@ app.post('/login', async(req,res)=>{
     if(!valid) return res.json({message:"Wrong password"});
 
     res.json({message:"Logged in"});
-  } catch(e){
+  }catch(e){
     console.log(e);
     res.status(500).json({message:"Error"});
   }
 });
 
-// ===== Agent Registration =====
+// ===== AGENT REGISTRATION =====
 app.post('/registerAgent', upload.fields([{name:'profilePic'},{name:'kitPic'}]), async(req,res)=>{
   try{
     const {name,email,password,address,service,experience,purpleStar} = req.body;
@@ -78,16 +89,16 @@ app.post('/registerAgent', upload.fields([{name:'profilePic'},{name:'kitPic'}]),
       address,
       service,
       experience,
-      profilePic: req.files['profilePic'][0].path,
-      kitPic: req.files['kitPic'][0].path,
+      profilePic: req.files['profilePic'] ? req.files['profilePic'][0].path : "",
+      kitPic: req.files['kitPic'] ? req.files['kitPic'][0].path : "",
       purpleStar: purpleStar === "true",
-      status: 'verified' // 👈 changed for testing
+      status: 'verified' // for testing (later change to 'pending')
     });
 
     await agent.save();
 
     res.json({message:"Agent submitted"});
-  } catch(e){
+  }catch(e){
     console.log(e);
     res.status(500).json({message:"Error"});
   }
@@ -101,21 +112,21 @@ app.get('/agents', async(req,res)=>{
     let agents;
 
     if(service){
-      agents = await Agent.find({service, status:'verified'});
-    } else {
-      agents = await Agent.find({status:'verified'});
+      agents = await Agent.find({ service });
+    }else{
+      agents = await Agent.find({});
     }
 
     res.json(agents);
-  } catch(e){
+  }catch(e){
     console.log(e);
     res.status(500).json({message:"Error"});
   }
 });
 
 // ===== ADD AGENT (FOR TESTING) =====
-app.post('/add-agent', async (req, res) => {
-  try {
+app.post('/add-agent', async(req,res)=>{
+  try{
     console.log(req.body);
 
     const agent = new Agent({
@@ -128,10 +139,10 @@ app.post('/add-agent', async (req, res) => {
 
     await agent.save();
 
-    res.json({message: "Agent added"});
-  } catch (e) {
+    res.json({message:"Agent added"});
+  }catch(e){
     console.log(e);
-    res.status(500).json({message: "Error"});
+    res.status(500).json({message:"Error"});
   }
 });
 
@@ -149,7 +160,7 @@ app.post('/book', async(req,res)=>{
     await booking.save();
 
     res.json({message:"Booking confirmed"});
-  } catch(e){
+  }catch(e){
     console.log(e);
     res.status(500).json({message:"Error"});
   }
@@ -162,4 +173,6 @@ app.get('/', (req, res) => {
 
 // ===== START SERVER =====
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
+app.listen(PORT, ()=>{
+  console.log(`Server running on port ${PORT}`);
+});
